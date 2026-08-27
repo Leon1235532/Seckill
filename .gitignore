@@ -1,0 +1,11 @@
+# build artifacts
+tmp/
+*.log
+
+# secrets
+config/.env
+
+# editor/OS noise
+.vscode/
+.idea/
+.DS_Store

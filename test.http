@@ -1,0 +1,18 @@
+###
+//create
+POST http://127.0.0.1:8080/addpdt
+Accept: application/json
+
+{
+    "name":"vivo",
+    "stock":50
+}
+
+###
+POST http://127.0.0.1:8080/seckill
+Accept: application/json
+
+{
+    "pid":2,
+    "uid":1
+}
