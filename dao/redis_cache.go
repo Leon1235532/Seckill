@@ -44,7 +44,7 @@ func PreloadActivity(pid uint) error { // 1. 备一个空的结构体准备装�
 	if err := Rdb.Set(context.Background(),
 		fmt.Sprintf("products:stock:%d", p.ID),
 		p.Stock, 0).Err(); err != nil {
-
+		return err
 	}
 
 	if err := Rdb.Set(context.Background(), // 把开始时间换成毫秒塞进 Redis
