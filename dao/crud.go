@@ -6,13 +6,21 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreatePdtInfo(pdtinfo *schemas.PdtCreate) error {
+func CreatePdtInfo(pdtinfo *schemas.PdtCreate) (uint, error) {
 	product := &models.Product{
-		Name:  pdtinfo.Name,
-		Stock: pdtinfo.Stock,
+		Name:      pdtinfo.Name,
+		Stock:     pdtinfo.Stock,
+		StartTime: &pdtinfo.StartTime,
+		EndTime:   &pdtinfo.EndTime,
 	}
 	err := DB.Create(product).Error
-	return err
+	return product.ID, err // GORM 建完后自动把自增主键回填进 product.ID
+}
+
+func QueryPinfo(pid uint) (models.Product, error) {
+	var p models.Product
+	err := DB.First(&p, pid).Error
+	return p, err
 }
 
 func QueryStock(pid uint) (int, error) {

@@ -23,7 +23,7 @@ func main() {
 	if err := dao.DB.AutoMigrate(&models.Product{}, &models.Order{}); err != nil {
 		log.Fatalf("create tables failed: %#v", err.Error())
 	}
-	dao.InitRedis()
+	dao.InitRedis(setting.Conf.RedisConfig)
 	service.StartWorker(10)
 	r := routers.Router()
 	if err := r.Run(fmt.Sprintf(":%d", setting.Conf.Port)); err != nil {

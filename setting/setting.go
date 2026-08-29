@@ -13,6 +13,7 @@ type AppConfig struct {
 	Release      bool `ini:"release"`
 	Port         int  `ini:"port"`
 	*MySQLConfig `ini:"mysql"`
+	*RedisConfig `ini:"redis"`
 }
 
 type MySQLConfig struct {
@@ -21,6 +22,10 @@ type MySQLConfig struct {
 	DB       string `ini:"db"`
 	Host     string `ini:"host"`
 	Port     int    `ini:"port"`
+}
+type RedisConfig struct {
+	Host string `ini:"host"`
+	Port int    `ini:"port"`
 }
 
 func Init(file string) error {

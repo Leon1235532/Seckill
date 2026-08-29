@@ -7,8 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// var mu sync.Mutex
-
 func CreatePdtHandler(c *gin.Context) {
 	var pdtinfo schemas.PdtCreate
 	if err := c.ShouldBindJSON(&pdtinfo); err != nil {
@@ -20,7 +18,8 @@ func CreatePdtHandler(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	if err := dao.CreatePdtInfo(&pdtinfo); err != nil {
+	id, err := dao.CreatePdtInfo(&pdtinfo)
+	if err != nil {
 		c.JSON(400, gin.H{
 			"code": 400,
 			"Msg":  "Interserver failed!",
@@ -29,6 +28,20 @@ func CreatePdtHandler(c *gin.Context) {
 		c.Abort()
 		return
 	}
+	// 编排逻辑: 建完户口本, 复印一份到 Redis (预热只发生在这里, 不在抢购路径上)
+	if err := dao.PreloadActivity(id); err != nil {
+		c.JSON(400, gin.H{
+			"code": 400,
+			"Msg":  "Preload activity failed!",
+			"Err":  err,
+		})
+		return
+	}
+	c.JSON(200, gin.H{
+		"code": 200,
+		"Msg":  "Product created.",
+		"ID":   id,
+	})
 }
 
 func SaleHandler(c *gin.Context) {
@@ -70,6 +83,18 @@ func SaleHandler(c *gin.Context) {
 		c.JSON(400, gin.H{
 			"code": 400,
 			"Msg":  "Each user may purchase this only once!",
+			"Err":  nil,
+		})
+	case 3:
+		c.JSON(400, gin.H{
+			"code": 400,
+			"Msg":  "Flash sale has not yet started!",
+			"Err":  nil,
+		})
+	case 4:
+		c.JSON(400, gin.H{
+			"code": 400,
+			"Msg":  "The event has ended!",
 			"Err":  nil,
 		})
 	}

@@ -4,8 +4,10 @@ POST http://127.0.0.1:8080/addpdt
 Accept: application/json
 
 {
-    "name":"vivo",
-    "stock":50
+    "name":"GPW",
+    "stock":100,
+    "starttime":"2026-08-30T09:00:00+08:00",
+    "endtime":"2026-08-31T09:00:00+08:00"
 }
 
 ###
