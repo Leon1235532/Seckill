@@ -18,3 +18,22 @@ Accept: application/json
     "pid":2,
     "uid":1
 }
+
+###
+POST http://127.0.0.1:8080/modify/1
+Accept: application/json
+
+{
+    "stock":100,
+    "starttime":"2026-08-31T09:00:00+08:00",
+    "endtime":"2026-09-01T09:00:00+08:00"
+}
+
+###
+DELETE  http://127.0.0.1:8080/delete/2
+Accept: application/json
+
+###
+//create
+GET  http://127.0.0.1:8080/checkpdt/1
+Accept: application/json

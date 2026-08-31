@@ -10,11 +10,34 @@ func CreatePdtInfo(pdtinfo *schemas.PdtCreate) (uint, error) {
 	product := &models.Product{
 		Name:      pdtinfo.Name,
 		Stock:     pdtinfo.Stock,
-		StartTime: &pdtinfo.StartTime,
-		EndTime:   &pdtinfo.EndTime,
+		StartTime: pdtinfo.StartTime,
+		EndTime:   pdtinfo.EndTime,
 	}
 	err := DB.Create(product).Error
 	return product.ID, err // GORM 建完后自动把自增主键回填进 product.ID
+}
+
+func UpdatePdtInfo(pid uint, info *schemas.PdtUpdate) error {
+	res := DB.Model(&models.Product{}).
+		Where("id = ?", pid).Updates(info)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func Deletepdt(pid uint) error {
+	res := DB.Delete(&models.Product{}, pid)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func QueryPinfo(pid uint) (models.Product, error) {

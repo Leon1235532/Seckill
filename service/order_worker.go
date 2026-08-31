@@ -7,7 +7,7 @@ import (
 	"github.com/Leon1235532/Seckill/schemas"
 )
 
-var OrderChan = make(chan schemas.ProductInfo, 1024)
+var OrderChan = make(chan schemas.PrdOrderInfo, 1024)
 
 func StartWorker(n int) {
 	for i := 0; i < n; i++ {

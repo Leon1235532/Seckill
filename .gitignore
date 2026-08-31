@@ -9,3 +9,6 @@ config/.env
 .vscode/
 .idea/
 .DS_Store
+
+# leetcode practice, unrelated to project
+leetcode/

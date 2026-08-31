@@ -1,15 +1,20 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Product struct {
-	ID        uint       `gorm:"primaryKey" json:"id"`
-	Name      string     `gorm:"not null" json:"name"`
-	Stock     int        `gorm:"not null" json:"stock"` // 真实库存
-	StartTime *time.Time `json:"starttime"`
-	EndTime   *time.Time `json:"endtime"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	Name      string         `gorm:"not null" json:"name"`
+	Stock     int            `gorm:"not null" json:"stock"` // 真实库存
+	StartTime *time.Time     `json:"starttime"`
+	EndTime   *time.Time     `json:"endtime"`
+	CreatedAt time.Time      `json:"-"`
+	UpdatedAt time.Time      `json:"-"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type Order struct {
