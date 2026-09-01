@@ -34,6 +34,5 @@ DELETE  http://127.0.0.1:8080/delete/2
 Accept: application/json
 
 ###
-//create
 GET  http://127.0.0.1:8080/checkpdt/1
 Accept: application/json

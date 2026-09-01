@@ -39,6 +39,9 @@ func SecKill(ctx context.Context, uid, pid uint) (int, error) {
 
 func ModifyRedis(pid uint, info *schemas.PdtUpdate) error {
 	ctx := context.Background()
+	if err := Rdb.Del(ctx, fmt.Sprintf("products:info:%d", pid)).Err(); err != nil {
+		log.Printf("del info cache pid=%d: %v", pid, err)
+	}
 	if info.Stock != nil {
 		if err := Rdb.Set(ctx, fmt.Sprintf("products:stock:%d", pid),
 			*info.Stock, 0).Err(); err != nil {
@@ -64,6 +67,9 @@ func ModifyRedis(pid uint, info *schemas.PdtUpdate) error {
 
 func DeleteRedis(pid uint) error {
 	ctx := context.Background()
+	if err := Rdb.Del(ctx, fmt.Sprintf("products:info:%d", pid)).Err(); err != nil {
+		log.Printf("del info cache pid=%d: %v", pid, err)
+	}
 	if err := Rdb.Del(ctx, fmt.Sprintf("products:stock:%d", pid)).Err(); err != nil {
 		return err
 	}
