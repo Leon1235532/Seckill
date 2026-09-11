@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
+	"log"
 	"strconv"
 
 	"github.com/Leon1235532/Seckill/dao"
+	"github.com/Leon1235532/Seckill/rabbitmq"
 	"github.com/Leon1235532/Seckill/schemas"
 	"github.com/Leon1235532/Seckill/service"
 	"github.com/gin-gonic/gin"
@@ -30,7 +33,7 @@ func CreatePdtHandler(c *gin.Context) {
 		})
 		return
 	}
-	// 编排逻辑: 建完户口本, 复印一份到 Redis (预热只发生在这里, 不在抢购路径上)
+	// 复印信息到 Redis缓存
 	if err := dao.PreloadActivity(id); err != nil {
 		c.JSON(500, gin.H{
 			"code": 500,
@@ -142,6 +145,7 @@ func DeleteHandler(c *gin.Context) {
 	})
 }
 
+// 查询商品信息接口，缓存不存在触发单飞模式拿数据库
 func CheckHandler(c *gin.Context) {
 	pidstr := c.Param("pid")
 	pid, err := strconv.Atoi(pidstr)
@@ -194,7 +198,13 @@ func SaleHandler(c *gin.Context) {
 	}
 	switch res {
 	case 0:
-		service.OrderChan <- info
+		rmq := rabbitmq.NewRabbitMQWork("seckill_queue")
+		defer rmq.Destory()
+		body, err := json.Marshal(info)
+		if err != nil {
+			log.Fatalf("结构体序列化失败: %v", err)
+		}
+		rmq.PublishWork(body)
 		c.JSON(200, gin.H{
 			"code": 200,
 			"Msg":  "Congratulations on buying successfully!",

@@ -6,6 +6,7 @@ import (
 
 	"github.com/Leon1235532/Seckill/dao"
 	"github.com/Leon1235532/Seckill/models"
+	"github.com/Leon1235532/Seckill/rabbitmq"
 	"github.com/Leon1235532/Seckill/routers"
 	"github.com/Leon1235532/Seckill/service"
 	"github.com/Leon1235532/Seckill/setting"
@@ -24,7 +25,11 @@ func main() {
 		log.Fatalf("create tables failed: %#v", err.Error())
 	}
 	dao.InitRedis(setting.Conf.RedisConfig)
+	//初始化rabbimq Tcp连接主干道
+	rabbitmq.InitRabbitMQ(rabbitmq.MQURL)
+
 	service.StartWorker(10)
+
 	r := routers.Router()
 	if err := r.Run(fmt.Sprintf(":%d", setting.Conf.Port)); err != nil {
 		log.Fatalf("router register failed: %#v", err.Error())
