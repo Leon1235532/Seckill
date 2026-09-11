@@ -152,6 +152,5 @@ func (r *RabbitMQ) ReceiveWork(taskFunc DoTaskFunc) {
 
 		}
 	}()
-	log.Printf(" [*] 底层监听组件就绪...")
 	<-forever
 }

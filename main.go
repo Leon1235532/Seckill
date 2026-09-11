@@ -24,10 +24,14 @@ func main() {
 	if err := dao.DB.AutoMigrate(&models.Product{}, &models.Order{}); err != nil {
 		log.Fatalf("create tables failed: %#v", err.Error())
 	}
+
+	//初始化redis连接
 	dao.InitRedis(setting.Conf.RedisConfig)
+
 	//初始化rabbimq Tcp连接主干道
 	rabbitmq.InitRabbitMQ(rabbitmq.MQURL)
 
+	//启动自定义数量的后台协程
 	service.StartWorker(10)
 
 	r := routers.Router()

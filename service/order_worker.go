@@ -28,4 +28,5 @@ func StartWorker(n int) {
 			})
 		}()
 	}
+	log.Printf("%d 个RabbitMQ 消费者后台协程初始化完毕,正在监听队列！", n)
 }
