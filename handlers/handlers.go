@@ -198,13 +198,19 @@ func SaleHandler(c *gin.Context) {
 	}
 	switch res {
 	case 0:
-		rmq := rabbitmq.NewRabbitMQWork("seckill_queue")
-		defer rmq.Destory()
 		body, err := json.Marshal(info)
 		if err != nil {
-			log.Fatalf("结构体序列化失败: %v", err)
+			log.Printf("struct marshal failed:%v", err)
 		}
-		rmq.PublishWork(body)
+		// 三个失败源(拨号/开channel/publish)全在这一个err里, 3次全败才走到这
+		if err := rabbitmq.PublishWithRetry("seckill_queue", body, 3); err != nil {
+			c.JSON(500, gin.H{
+				"code": 500,
+				"Msg":  "MQ abnormal, please check it!",
+				"Err":  err.Error(),
+			})
+			return
+		}
 		c.JSON(200, gin.H{
 			"code": 200,
 			"Msg":  "Congratulations on buying successfully!",

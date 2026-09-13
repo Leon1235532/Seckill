@@ -1,17 +1,19 @@
 package rabbitmq
 
 import (
-	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+var connMu sync.Mutex
+
 // 🌟 1. 全局唯一的 TCP 连接
 var GlobalConn *amqp.Connection
 
-// 🌟 2. 项目启动时调用一次，修筑主干道
+// 🌟 2. 项目启动时调用一次，建立主干Tcp连接
 func InitRabbitMQ(mqUrl string) {
 	var err error
 	GlobalConn, err = amqp.Dial(mqUrl)
@@ -45,6 +47,23 @@ type RabbitMQ struct {
 	Mqurl string
 }
 
+// GetConn 返回可用连接; 断了就重拨。锁防断线瞬间10个消费者+请求协程同时重拨互相覆盖
+func GetConn() (*amqp.Connection, error) {
+	connMu.Lock()
+	defer connMu.Unlock()
+	if GlobalConn != nil && !GlobalConn.IsClosed() {
+		return GlobalConn, nil // 活着, 直接复用
+	}
+	conn, err := amqp.Dial(MQURL)
+	if err != nil {
+		return nil, err // 连接失败, 交给attempt判负
+	}
+	// 连接成功再赋给全局连接
+	GlobalConn = conn
+	log.Println("RabbitMQ connected/reconnected!")
+	return GlobalConn, nil
+}
+
 func NewRabbitMQ(queueName string, exchange string, key string) *RabbitMQ {
 	return &RabbitMQ{QueueName: queueName, Exchange: exchange, Key: key, Mqurl: MQURL}
 }
@@ -56,32 +75,25 @@ func (r *RabbitMQ) Destory() {
 	}
 }
 
-// 错误处理函数
-func (r *RabbitMQ) failOnErr(err error, message string) {
-	if err != nil {
-		log.Fatalf("%s:%s", message, err)
-	}
-}
-
 // work模式
 
 // work模式创建RabbitMQ实例，建立连接
-func NewRabbitMQWork(queueName string) *RabbitMQ {
-	if GlobalConn == nil {
-		log.Fatal("RabbitMQ global connection not initialized!")
+func NewRabbitMQWork(queueName string) (*RabbitMQ, error) {
+	conn, err := GetConn()
+	if err != nil {
+		return nil, err
 	}
-	//创建RabbitMQ实例
 	rabbitmq := NewRabbitMQ(queueName, "", "")
-	rabbitmq.conn = GlobalConn
-	var err error
-	//从连接上开一条会话 → channel
-	rabbitmq.channel, err = GlobalConn.Channel()
-	rabbitmq.failOnErr(err, "failed to open a channel")
-	return rabbitmq
+	rabbitmq.conn = conn
+	rabbitmq.channel, err = conn.Channel()
+	if err != nil {
+		return nil, err
+	}
+	return rabbitmq, nil
 }
 
 // work模式下生产者发消息
-func (r *RabbitMQ) PublishWork(message []byte) {
+func (r *RabbitMQ) PublishWork(message []byte) error {
 	//调用channel 发送消息到队列中
 	err := r.channel.Publish(
 		r.Exchange,
@@ -96,8 +108,9 @@ func (r *RabbitMQ) PublishWork(message []byte) {
 			DeliveryMode: amqp.Persistent,
 		})
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
+	return nil
 }
 
 // 定义回调函数签名
@@ -124,33 +137,60 @@ func (r *RabbitMQ) ReceiveWork(taskFunc DoTaskFunc) {
 	// 指定死信队列RoutingKey
 	args["x-dead-letter-routing-key"] = "dead"
 
-	q, _ := r.channel.QueueDeclare(r.QueueName, true, false, false, false, args)
-	msgs, _ := r.channel.Consume(q.Name, "", false, false, false, false, nil)
+	q, err := r.channel.QueueDeclare(r.QueueName, true, false, false, false, args)
+	if err != nil {
+		log.Fatalf("QueueDeclare %s failed: %v (check old queue params in mgmt console, delete seckill_queue and restart)", r.QueueName, err)
+	}
+	msgs, err := r.channel.Consume(q.Name, "", false, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("Consume %s failed: %v", q.Name, err)
+	}
 
-	forever := make(chan bool)
-	go func() {
-		for d := range msgs {
-			var err error
-			maxRetry := 3 // 最大重试次数
-			for i := range maxRetry {
-				err = taskFunc(d.Body)
+	for d := range msgs {
+		var err error
+		maxRetry := 3 // 最大重试次数
+		for i := 1; i <= maxRetry; i++ {
+			err = taskFunc(d.Body)
 
-				if err == nil {
-					break
-				}
-				log.Printf("⚠️ 订单处理失败 (第 %d/%d 次): %v", i+1, maxRetry, err)
-				// 失败后等1s再试 (类似 Spring 的 BackOff)
+			if err == nil {
+				break
+			}
+			log.Printf("⚠️ 订单处理失败 (第 %d/%d 次): %v", i, maxRetry, err)
+			// 失败后等1s再试 (类似 Spring 的 BackOff)
+			if i < maxRetry {
 				time.Sleep(1 * time.Second)
 			}
-			if err == nil {
-				d.Ack(false)
-			} else {
-				//重试次数耗尽，发给死信队列，人工处理
-				log.Printf("❌ %d 次重试全部失败,消息进入死信队列: %s", maxRetry, string(d.Body))
-				d.Nack(false, false)
-			}
-
 		}
-	}()
-	<-forever
+
+		if err == nil {
+			d.Ack(false)
+		} else {
+			//重试次数耗尽，发给死信队列，人工处理
+			log.Printf("❌ %d 次重试全部失败,消息进入死信队列: %s", maxRetry, string(d.Body))
+			d.Nack(false, false)
+		}
+
+	}
+}
+
+// 生产端重试: 每次attempt重新拿连接(断了GetConn里自动重拨), 全败返回最后的err
+func PublishWithRetry(queueName string, body []byte, attempts int) error {
+	var lastErr error
+	for i := 1; i <= attempts; i++ {
+		rmq, err := NewRabbitMQWork(queueName)
+		if err != nil {
+			lastErr = err
+		} else {
+			lastErr = rmq.PublishWork(body)
+			rmq.Destory()
+			if lastErr == nil {
+				return nil
+			}
+		}
+		log.Printf("publish attempt %d/%d failed: %v", i, attempts, lastErr)
+		if i < attempts {
+			time.Sleep(1 * time.Second) // ponytail: 固定退避, 空转天花板
+		}
+	}
+	return lastErr
 }
