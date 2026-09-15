@@ -40,7 +40,7 @@ func Deletepdt(pid uint) error {
 	return nil
 }
 
-func QueryPinfo(pid uint) (models.Product, error) {
+func QueryPdtinfo(pid uint) (models.Product, error) {
 	var p models.Product
 	err := DB.First(&p, pid).Error
 	return p, err

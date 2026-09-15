@@ -22,7 +22,7 @@ func GetPdtInfoByOne(pid uint) ([]byte, error) {
 	}
 
 	fn := func() (any, error) {
-		p, err := dao.QueryPinfo(pid) // 裸IO
+		p, err := dao.QueryPdtinfo(pid) // 裸IO
 		if err != nil {
 			return nil, err
 		}
@@ -30,7 +30,7 @@ func GetPdtInfoByOne(pid uint) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := dao.SetInfoCache(pid, data); err != nil { // 回填失败别吞, 但也别因它不返回数据
+		if err := dao.SaveInfoCache(pid, data); err != nil { // 回填失败别吞, 但也别因它不返回数据
 			return nil, err
 		}
 		return data, nil

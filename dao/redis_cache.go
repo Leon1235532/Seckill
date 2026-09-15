@@ -54,8 +54,9 @@ func CompensateSecKill(uid, pid uint) error {
 	return CompScript.Run(ctx, Rdb, []string{stockKey, orderKey}, uid).Err()
 }
 
-func ModifyRedis(pid uint, info *schemas.PdtUpdate) error {
+func ModifyCache(pid uint, info *schemas.PdtUpdate) error {
 	ctx := context.Background()
+	// 删改操作需将缓存中的商品信息删掉
 	if err := Rdb.Del(ctx, fmt.Sprintf("products:info:%d", pid)).Err(); err != nil {
 		log.Printf("del info cache pid=%d: %v", pid, err)
 	}
@@ -82,7 +83,7 @@ func ModifyRedis(pid uint, info *schemas.PdtUpdate) error {
 	return nil // 什么都没改 → 缓存本来就没错, 什么都不用做
 }
 
-func DeleteRedis(pid uint) error {
+func DeleteCache(pid uint) error {
 	ctx := context.Background()
 	if err := Rdb.Del(ctx, fmt.Sprintf("products:info:%d", pid)).Err(); err != nil {
 		log.Printf("del info cache pid=%d: %v", pid, err)
@@ -108,13 +109,14 @@ func GetRedis(pid uint) ([]byte, error) {
 	return val, nil
 }
 
-func SetInfoCache(pid uint, data []byte) error { // 裸SETEX
+func SaveInfoCache(pid uint, data []byte) error { // 裸SETEX
 	ctx := context.Background()
-	return Rdb.Set(ctx, fmt.Sprintf("products:info:%d", pid), data, time.Minute).Err()
+	// 设置过期时间的缓存键，避免脏数据
+	return Rdb.Set(ctx, fmt.Sprintf("products:info:%d", pid), data, 5*time.Second).Err()
 }
 
-func PreloadActivity(pid uint) error { // 1. 备一个空的结构体准备装货
-	p, err := QueryPinfo(pid)
+func AddInfoCache(pid uint) error { // 1. 备一个空的结构体准备装货
+	p, err := QueryPdtinfo(pid)
 	if err != nil {
 		return err
 	}

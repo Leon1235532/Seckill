@@ -25,8 +25,8 @@ func CreatePdtHandler(c *gin.Context) {
 		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
-	// 复印信息到 Redis缓存
-	if err := dao.PreloadActivity(id); err != nil {
+	// info同步保存到 Redis缓存
+	if err := dao.AddInfoCache(id); err != nil {
 		FailResponse(c, 500, "Preload activity failed!", err)
 		return
 	}
@@ -55,7 +55,7 @@ func UpdatePdtHandler(c *gin.Context) {
 		return
 	}
 
-	if err := dao.ModifyRedis(uint(pid), &modifyinfo); err != nil {
+	if err := dao.ModifyCache(uint(pid), &modifyinfo); err != nil {
 		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
@@ -79,7 +79,7 @@ func DeleteHandler(c *gin.Context) {
 		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
-	if err := dao.DeleteRedis(uint(pid)); err != nil {
+	if err := dao.DeleteCache(uint(pid)); err != nil {
 		FailResponse(c, 500, ServerMsg, err)
 		return
 	}

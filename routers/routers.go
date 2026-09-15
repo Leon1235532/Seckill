@@ -14,7 +14,7 @@ func Router() *gin.Engine {
 	r := gin.Default()
 	r.GET("/checkpdt/:pid", handlers.CheckHandler)
 	r.POST("/addpdt", handlers.CreatePdtHandler)
-	r.POST("/seckill", bocket.RateLimiter(bocket.NewTokenBucket(100, 100)), handlers.SaleHandler)
+	r.POST("/seckill", bocket.RateLimiter(bocket.NewTokenBucket(1000, 1000)), handlers.SaleHandler)
 	r.POST("/modify/:pid", handlers.UpdatePdtHandler)
 	r.DELETE("/delete/:pid", handlers.DeleteHandler)
 	return r
