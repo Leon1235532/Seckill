@@ -17,36 +17,20 @@ import (
 func CreatePdtHandler(c *gin.Context) {
 	var pdtinfo schemas.PdtCreate
 	if err := c.ShouldBindJSON(&pdtinfo); err != nil {
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "Parameter reception failed.",
-			"Err":  err,
-		})
+		FailResponse(c, 400, ParaMsg, err)
 		return
 	}
 	id, err := dao.CreatePdtInfo(&pdtinfo)
 	if err != nil {
-		c.JSON(500, gin.H{
-			"code": 500,
-			"Msg":  "Interserver failed!",
-			"Err":  err,
-		})
+		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
 	// 复印信息到 Redis缓存
 	if err := dao.PreloadActivity(id); err != nil {
-		c.JSON(500, gin.H{
-			"code": 500,
-			"Msg":  "Preload activity failed!",
-			"Err":  err,
-		})
+		FailResponse(c, 500, "Preload activity failed!", err)
 		return
 	}
-	c.JSON(200, gin.H{
-		"code": 200,
-		"Msg":  "Product created.",
-		"ID":   id,
-	})
+	Success(c, "Product created!", id)
 }
 
 func UpdatePdtHandler(c *gin.Context) {
@@ -54,95 +38,52 @@ func UpdatePdtHandler(c *gin.Context) {
 	pidstr := c.Param("pid")
 	pid, err := strconv.Atoi(pidstr)
 	if err != nil || pid < 0 {
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "Parameter reception failed or pid is not uint",
-			"Err":  err,
-		})
+		FailResponse(c, 400, ParaPidMsg, err)
 		return
 	}
 	if err := c.ShouldBindJSON(&modifyinfo); err != nil {
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "Parameter reception failed.",
-			"Err":  err,
-		})
+		FailResponse(c, 400, ParaMsg, err)
 		return
 	}
 	err = dao.UpdatePdtInfo(uint(pid), &modifyinfo)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(404, gin.H{
-			"code": 404,
-			"Msg":  "Product not found.",
-		})
+		FailResponse(c, 404, FindMsg, err)
 		return
 	}
 	if err != nil {
-		c.JSON(500, gin.H{
-			"code": 500,
-			"Msg":  "Interserver failed!",
-			"Err":  err,
-		})
+		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
 
 	if err := dao.ModifyRedis(uint(pid), &modifyinfo); err != nil {
-		c.JSON(500, gin.H{
-			"code": 500,
-			"Msg":  "Interserver failed!",
-			"Err":  err,
-		})
+		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
 
-	c.JSON(200, gin.H{
-		"code": 200,
-		"Msg":  "Product info modified.",
-		"ID":   pid,
-	})
+	Success(c, "Product info modified!", pid)
 }
 
 func DeleteHandler(c *gin.Context) {
 	pidstr := c.Param("pid")
 	pid, err := strconv.Atoi(pidstr)
 	if err != nil || pid < 0 {
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "Parameter reception failed or pid is not uint",
-			"Err":  err,
-		})
+		FailResponse(c, 400, ParaPidMsg, err)
 		return
 	}
 	err = dao.Deletepdt(uint(pid))
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(404, gin.H{
-			"code": 404,
-			"Msg":  "Product not found!",
-			"Err":  err,
-		})
+		FailResponse(c, 404, FindMsg, err)
 		return
 	}
 	if err != nil {
-		c.JSON(500, gin.H{
-			"code": 500,
-			"Msg":  "Interserver failed!",
-			"Err":  err,
-		})
+		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
 	if err := dao.DeleteRedis(uint(pid)); err != nil {
-		c.JSON(500, gin.H{
-			"code": 500,
-			"Msg":  "Interserver failed!",
-			"Err":  err,
-		})
+		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
-	c.JSON(200, gin.H{
-		"code": 200,
-		"Msg":  "Product delete succeed!",
-		"ID":   pid,
-	})
+	Success(c, "Product delete succeed!", pid)
 }
 
 // 查询商品信息接口，缓存不存在触发单飞模式拿数据库
@@ -150,28 +91,16 @@ func CheckHandler(c *gin.Context) {
 	pidstr := c.Param("pid")
 	pid, err := strconv.Atoi(pidstr)
 	if err != nil || pid < 0 {
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "Parameter reception failed or pid is not uint",
-			"Err":  err,
-		})
+		FailResponse(c, 400, ParaPidMsg, err)
 		return
 	}
 	data, err := service.GetPdtInfoByOne(uint(pid))
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(404, gin.H{
-			"code": 404,
-			"Msg":  "Product not found!",
-			"err":  err,
-		})
+		FailResponse(c, 404, FindMsg, err)
 		return
 	}
 	if err != nil {
-		c.JSON(500, gin.H{
-			"code": 500,
-			"Msg":  "Interserver failed!",
-			"Err":  err,
-		})
+		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
 	c.Data(200, "application/json", data)
@@ -180,33 +109,22 @@ func CheckHandler(c *gin.Context) {
 func SaleHandler(c *gin.Context) {
 	var info schemas.PrdOrderInfo
 	if err := c.ShouldBindJSON(&info); err != nil {
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "Parameter reception failed.",
-			"Err":  err,
-		})
+		FailResponse(c, 400, ParaMsg, err)
 		return
 	}
 
 	// 熔断器状态为Open时，直接拦截，不进redis，不扣库存
 	if rabbitmq.MQOpen() {
-		c.JSON(503, gin.H{
-			"code": 503,
-			"Msg":  "System busy, please try again later!",
-			"Err":  nil,
-		})
+		FailResponse(c, 503, "System busy, please try again later!", nil)
 		return
 	}
 
 	res, err := dao.SecKill(c.Request.Context(), info.Uid, info.Pid)
 	if err != nil {
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "interserver failed!",
-			"Err":  err,
-		})
+		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
+	// 0:成功，1:库存不足，2:重复下单，3:时间未开始，4:活动已结束
 	switch res {
 	case 0:
 		body, err := json.Marshal(info)
@@ -220,46 +138,21 @@ func SaleHandler(c *gin.Context) {
 					info.Uid, info.Pid, compErr)
 			}
 			// 三次重试资源耗尽才报错，连续报错五次后触发熔断，状态转为Open
-			c.JSON(500, gin.H{
-				"code": 500,
-				"Msg":  "MQ abnormal, please check it!",
-				"Err":  err.Error(),
-			})
+			FailResponse(c, 500, "MQ abnormal, please check it!", err)
 			return
 		}
-		c.JSON(200, gin.H{
-			"code": 200,
-			"Msg":  "Congratulations on buying successfully!",
-			"Err":  nil,
-		})
+		Success(c, "Congratulations on buying successfully!", nil)
+
 	case 1:
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "Sorry, out of stock!",
-			"Err":  nil,
-		})
+		FailResponse(c, 400, "Sorry, out of stock!", nil)
+
 	case 2:
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "Each user may purchase this only once!",
-			"Err":  nil,
-		})
+		FailResponse(c, 400, "Each user may purchase this only once!", nil)
+
 	case 3:
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "Flash sale has not yet started!",
-			"Err":  nil,
-		})
+		FailResponse(c, 400, "Flash sale has not yet started!", nil)
+
 	case 4:
-		c.JSON(400, gin.H{
-			"code": 400,
-			"Msg":  "The event has ended!",
-			"Err":  nil,
-		})
+		FailResponse(c, 400, "The event has ended!", nil)
 	}
-
 }
-
-//返回 2 代表重复下单，直接拦截
-//返回 1 代表库存不足，已经被抢光了
-//0成功，1代表库存不足，2代表重复下单，3代表时间未开始。4代表活动已结束
