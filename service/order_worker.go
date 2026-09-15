@@ -10,16 +10,19 @@ import (
 	"github.com/Leon1235532/Seckill/schemas"
 )
 
+// 消费者 Consumer
 func StartWorker(n int) {
 	for i := 1; i <= n; i++ {
 		go func(num int) {
-			//状态标志
+			// 重连状态标志位
 			isReconnecting := false
 			for {
 				rmq, err := rabbitmq.NewRabbitMQWork("seckill_queue")
 				if err != nil {
+					// 非重连状态断连时才打印日志，已经是重试状态不再重复打印
 					if !isReconnecting {
 						log.Printf("consumer-%d 连接失败:%v, 3s后重试", num, err)
+						// 修改重连状态
 						isReconnecting = true
 					}
 					time.Sleep(3 * time.Second)
@@ -50,6 +53,8 @@ func StartWorker(n int) {
 				//连接正常时ReceiveWork会持续监听，退出则说明连接异常了
 				rmq.Destory()
 				log.Printf("consumer-%d 连接断开,3s后重连", num)
+				// 标记重连状态
+				isReconnecting = true
 				time.Sleep(3 * time.Second)
 			}
 		}(i)

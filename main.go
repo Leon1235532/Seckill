@@ -15,7 +15,7 @@ import (
 const FilePath = "./config/config.ini"
 
 func main() {
-	if err := setting.Init(FilePath); err != nil {
+	if err := setting.InitConfig(FilePath); err != nil {
 		log.Fatalf("load mysql config failed: %#v", err.Error())
 	}
 	if err := dao.InitDB(setting.Conf.MySQLConfig); err != nil {
@@ -29,7 +29,7 @@ func main() {
 	dao.InitRedis(setting.Conf.RedisConfig)
 
 	//初始化rabbimq Tcp连接主干道
-	rabbitmq.InitRabbitMQ(rabbitmq.MQURL)
+	rabbitmq.InitRabbitMQ(setting.Conf.RabbitMQConfig)
 
 	//启动自定义数量的后台协程
 	service.StartWorker(10)

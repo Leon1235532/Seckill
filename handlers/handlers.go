@@ -157,7 +157,7 @@ func CheckHandler(c *gin.Context) {
 		})
 		return
 	}
-	data, err := service.GetPdtInfo(uint(pid))
+	data, err := service.GetPdtInfoByOne(uint(pid))
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		c.JSON(404, gin.H{
 			"code": 404,
@@ -187,6 +187,17 @@ func SaleHandler(c *gin.Context) {
 		})
 		return
 	}
+
+	// 熔断器状态为Open时，直接拦截，不进redis，不扣库存
+	if rabbitmq.MQOpen() {
+		c.JSON(503, gin.H{
+			"code": 503,
+			"Msg":  "System busy, please try again later!",
+			"Err":  nil,
+		})
+		return
+	}
+
 	res, err := dao.SecKill(c.Request.Context(), info.Uid, info.Pid)
 	if err != nil {
 		c.JSON(400, gin.H{
@@ -202,8 +213,13 @@ func SaleHandler(c *gin.Context) {
 		if err != nil {
 			log.Printf("struct marshal failed:%v", err)
 		}
-		// 三个失败源(拨号/开channel/publish)全在这一个err里, 3次全败才走到这
-		if err := rabbitmq.PublishWithRetry("seckill_queue", body, 3); err != nil {
+
+		if err := rabbitmq.PublishWithBreaker("seckill_queue", body, 3); err != nil {
+			if compErr := dao.CompensateSecKill(info.Uid, info.Pid); compErr != nil {
+				log.Printf("Order Compensate Failed, uid=%d pid=%d: %v",
+					info.Uid, info.Pid, compErr)
+			}
+			// 三次重试资源耗尽才报错，连续报错五次后触发熔断，状态转为Open
 			c.JSON(500, gin.H{
 				"code": 500,
 				"Msg":  "MQ abnormal, please check it!",

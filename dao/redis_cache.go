@@ -12,11 +12,17 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+//在编译时将包目录或子目录中的文件内容初始化为字符串，此处为lua脚本文件
+
 //go:embed seckill.lua
 var luaScript string
 
+//go:embed compensate.lua
+var compScript string
+
 var Rdb *redis.Client                   // 连 Redis 的管道 (像 DB之于MySQL )
-var Script = redis.NewScript(luaScript) // 点菜卡, 只建一次
+var Script = redis.NewScript(luaScript) // 预生成lua脚本的SHA1 哈希值
+var CompScript = redis.NewScript(compScript)
 
 func InitRedis(cfg *setting.RedisConfig) {
 	Rdb = redis.NewClient(&redis.Options{
@@ -33,8 +39,19 @@ func SecKill(ctx context.Context, uid, pid uint) (int, error) {
 	orderKey := fmt.Sprintf("products:order:%d", pid)
 	startKey := fmt.Sprintf("products:start:%d", pid)
 	endKey := fmt.Sprintf("products:end:%d", pid)
+	// Run()函数会先尝试EVALSHA命令(让Redis用这个哈希值的脚本跑一下)，如果 Redis 中没有缓存这个哈希值的脚本，
+	// 就会降级为EVAL(把变量里的完整 Lua 脚本内容通过 EVAL 命令发送给 Redis 执行)，并将这个哈希值的脚本记录在内存中
+	// 如果脚本没有修改即哈希值不变，redis会直接通过缓存跑脚本，节省带宽
 	res, err := Script.Run(ctx, Rdb, []string{stockKey, orderKey, startKey, endKey}, uid).Int()
 	return res, err
+}
+
+// publish彻底失败时, 把Lua扣掉的库存和已购标记补偿回去
+func CompensateSecKill(uid, pid uint) error {
+	ctx := context.Background()
+	stockKey := fmt.Sprintf("products:stock:%d", pid)
+	orderKey := fmt.Sprintf("products:order:%d", pid)
+	return CompScript.Run(ctx, Rdb, []string{stockKey, orderKey}, uid).Err()
 }
 
 func ModifyRedis(pid uint, info *schemas.PdtUpdate) error {

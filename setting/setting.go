@@ -10,10 +10,11 @@ import (
 var Conf = new(AppConfig)
 
 type AppConfig struct {
-	Release      bool `ini:"release"`
-	Port         int  `ini:"port"`
-	*MySQLConfig `ini:"mysql"`
-	*RedisConfig `ini:"redis"`
+	Release         bool `ini:"release"`
+	Port            int  `ini:"port"`
+	*MySQLConfig    `ini:"mysql"`
+	*RedisConfig    `ini:"redis"`
+	*RabbitMQConfig `ini:"rabbitmq"`
 }
 
 type MySQLConfig struct {
@@ -28,7 +29,15 @@ type RedisConfig struct {
 	Port int    `ini:"port"`
 }
 
-func Init(file string) error {
+type RabbitMQConfig struct {
+	User        string
+	Password    string
+	Host        string `ini:"host"`
+	Port        int    `ini:"port"`
+	VirtualHost string `ini:"vhost"`
+}
+
+func InitConfig(file string) error {
 	_ = godotenv.Load("./config/.env")
 	err := ini.MapTo(Conf, file)
 	if err != nil {
@@ -36,5 +45,7 @@ func Init(file string) error {
 	}
 	Conf.MySQLConfig.User = os.Getenv("MYSQL_USER")
 	Conf.MySQLConfig.Password = os.Getenv("MYSQL_PASSWORD")
+	Conf.RabbitMQConfig.User = os.Getenv("RABBITMQ_USER")
+	Conf.RabbitMQConfig.Password = os.Getenv("RABBITMQ_PASSWORD")
 	return nil
 }

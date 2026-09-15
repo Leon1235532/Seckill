@@ -12,7 +12,7 @@ import (
 
 var g singleflight.Group
 
-func GetPdtInfo(pid uint) ([]byte, error) {
+func GetPdtInfoByOne(pid uint) ([]byte, error) {
 	val, err := dao.GetRedis(pid)
 	if err == nil {
 		return val, nil

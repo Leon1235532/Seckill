@@ -2,80 +2,14 @@ package rabbitmq
 
 import (
 	"log"
-	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-var connMu sync.Mutex
-
-// 🌟 1. 全局唯一的 TCP 连接
-var GlobalConn *amqp.Connection
-
-// 🌟 2. 项目启动时调用一次，建立主干Tcp连接
-func InitRabbitMQ(mqUrl string) {
-	var err error
-	GlobalConn, err = amqp.Dial(mqUrl)
-	if err != nil {
-		log.Fatalf("RabbitMQ global TCP connect failed!: %v", err)
-	}
-	log.Println("RabbitMQ global TCP connect succeed!")
-}
-
-// 🌟 3. 项目彻底退出时，拆除主干道
-func CloseRabbitMQ() {
-	if GlobalConn != nil {
-		GlobalConn.Close()
-		log.Println("RabbitMQ 全局TCP连接已关闭。")
-	}
-}
-
-// amqp://用户名:密码@主机地址:端口号/VirtualHost
-const MQURL = "amqp://admin:123456@127.0.0.1:5672/seckill"
-
-type RabbitMQ struct {
-	conn    *amqp.Connection
-	channel *amqp.Channel
-	//队列名称
-	QueueName string
-	//交换机名称
-	Exchange string
-	//bind Key 名称
-	Key string
-	//连接信息
-	Mqurl string
-}
-
-// GetConn 返回可用连接; 断了就重拨。锁防断线瞬间10个消费者+请求协程同时重拨互相覆盖
-func GetConn() (*amqp.Connection, error) {
-	connMu.Lock()
-	defer connMu.Unlock()
-	if GlobalConn != nil && !GlobalConn.IsClosed() {
-		return GlobalConn, nil // 活着, 直接复用
-	}
-	conn, err := amqp.Dial(MQURL)
-	if err != nil {
-		return nil, err // 连接失败, 交给attempt判负
-	}
-	// 连接成功再赋给全局连接
-	GlobalConn = conn
-	log.Println("RabbitMQ connected/reconnected!")
-	return GlobalConn, nil
-}
-
 func NewRabbitMQ(queueName string, exchange string, key string) *RabbitMQ {
 	return &RabbitMQ{QueueName: queueName, Exchange: exchange, Key: key, Mqurl: MQURL}
 }
-
-// 断开各自channel
-func (r *RabbitMQ) Destory() {
-	if r.channel != nil {
-		r.channel.Close()
-	}
-}
-
-// work模式
 
 // work模式创建RabbitMQ实例，建立连接
 func NewRabbitMQWork(queueName string) (*RabbitMQ, error) {
@@ -188,8 +122,9 @@ func PublishWithRetry(queueName string, body []byte, attempts int) error {
 			}
 		}
 		log.Printf("publish attempt %d/%d failed: %v", i, attempts, lastErr)
+		// 失败后等待1s再重试
 		if i < attempts {
-			time.Sleep(1 * time.Second) // ponytail: 固定退避, 空转天花板
+			time.Sleep(1 * time.Second)
 		}
 	}
 	return lastErr
