@@ -1,14 +1,9 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
-	"log"
 	"strconv"
 
-	"github.com/Leon1235532/Seckill/cache"
-	"github.com/Leon1235532/Seckill/dao"
-	"github.com/Leon1235532/Seckill/rabbitmq"
 	"github.com/Leon1235532/Seckill/schemas"
 	"github.com/Leon1235532/Seckill/service"
 	"github.com/gin-gonic/gin"
@@ -21,16 +16,12 @@ func CreatePdtHandler(c *gin.Context) {
 		FailResponse(c, 400, ParaMsg, err)
 		return
 	}
-	id, err := dao.CreatePdtInfo(&pdtinfo)
+	id, err := service.CreatePdt(&pdtinfo)
 	if err != nil {
 		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
-	// info同步保存到 Redis缓存
-	if err := cache.AddInfoCache(id); err != nil {
-		FailResponse(c, 500, "Preload activity failed!", err)
-		return
-	}
+
 	Success(c, "Product created!", id)
 }
 
@@ -46,17 +37,14 @@ func UpdatePdtHandler(c *gin.Context) {
 		FailResponse(c, 400, ParaMsg, err)
 		return
 	}
-	err = dao.UpdatePdtInfo(uint(pid), &modifyinfo)
+
+	err = service.UpdatePdt(uint(pid), &modifyinfo)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		FailResponse(c, 404, FindMsg, err)
 		return
 	}
-	if err != nil {
-		FailResponse(c, 500, ServerMsg, err)
-		return
-	}
 
-	if err := cache.ModifyCache(uint(pid), &modifyinfo); err != nil {
+	if err != nil {
 		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
@@ -71,7 +59,7 @@ func DeleteHandler(c *gin.Context) {
 		FailResponse(c, 400, ParaPidMsg, err)
 		return
 	}
-	err = dao.Deletepdt(uint(pid))
+	err = service.DeletePdt(uint(pid))
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		FailResponse(c, 404, FindMsg, err)
 		return
@@ -80,10 +68,7 @@ func DeleteHandler(c *gin.Context) {
 		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
-	if err := cache.DeleteCache(uint(pid)); err != nil {
-		FailResponse(c, 500, ServerMsg, err)
-		return
-	}
+
 	Success(c, "Product delete succeed!", pid)
 }
 
@@ -114,46 +99,21 @@ func SaleHandler(c *gin.Context) {
 		return
 	}
 
-	// 熔断器状态为Open时，直接拦截，不进redis，不扣库存
-	if rabbitmq.MQOpen() {
+	err := service.Seckill(c.Request.Context(), info.Uid, info.Pid)
+	switch {
+	case errors.Is(err, service.ErrMQOpen):
 		FailResponse(c, 503, "System busy, please try again later!", nil)
-		return
-	}
-
-	res, err := cache.SecKill(c.Request.Context(), info.Uid, info.Pid)
-	if err != nil {
-		FailResponse(c, 500, ServerMsg, err)
-		return
-	}
-	// 0:成功，1:库存不足，2:重复下单，3:时间未开始，4:活动已结束
-	switch res {
-	case 0:
-		body, err := json.Marshal(info)
-		if err != nil {
-			log.Printf("struct marshal failed:%v", err)
-		}
-
-		if err := rabbitmq.PublishWithBreaker("seckill_queue", body, 3); err != nil {
-			if compErr := cache.CompensateSecKill(info.Uid, info.Pid); compErr != nil {
-				log.Printf("Order Compensate Failed, uid=%d pid=%d: %v",
-					info.Uid, info.Pid, compErr)
-			}
-			// 三次重试资源耗尽才报错，连续报错五次后触发熔断，状态转为Open
-			FailResponse(c, 500, "MQ abnormal, please check it!", err)
-			return
-		}
-		Success(c, "Congratulations on buying successfully!", nil)
-
-	case 1:
+	case errors.Is(err, service.ErrSoldOut):
 		FailResponse(c, 400, "Sorry, out of stock!", nil)
-
-	case 2:
+	case errors.Is(err, service.ErrDupOrder):
 		FailResponse(c, 400, "Each user may purchase this only once!", nil)
-
-	case 3:
+	case errors.Is(err, service.ErrNotStart):
 		FailResponse(c, 400, "Flash sale has not yet started!", nil)
-
-	case 4:
+	case errors.Is(err, service.ErrEnded):
 		FailResponse(c, 400, "The event has ended!", nil)
+	case err != nil:
+		FailResponse(c, 500, ServerMsg, err)
+	default:
+		Success(c, "Congratulations on buying successfully!", nil)
 	}
 }
