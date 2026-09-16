@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/Leon1235532/Seckill/cache"
 	"github.com/Leon1235532/Seckill/dao"
 	"github.com/Leon1235532/Seckill/models"
 	"github.com/Leon1235532/Seckill/rabbitmq"
@@ -26,7 +27,7 @@ func main() {
 	}
 
 	//初始化redis连接
-	dao.InitRedis(setting.Conf.RedisConfig)
+	cache.InitRedis(setting.Conf.RedisConfig)
 
 	//初始化rabbimq Tcp连接主干道
 	rabbitmq.InitRabbitMQ(setting.Conf.RabbitMQConfig)

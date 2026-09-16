@@ -24,7 +24,7 @@ POST http://127.0.0.1:8080/modify/1
 Accept: application/json
 
 {
-    "stock":1,
+    "stock":100,
     "starttime":"2026-09-15T09:00:00+08:00",
     "endtime":"2026-09-16T09:00:00+08:00"
 }

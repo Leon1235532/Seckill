@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/Leon1235532/Seckill/cache"
 	"github.com/Leon1235532/Seckill/dao"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
@@ -13,7 +14,7 @@ import (
 var g singleflight.Group
 
 func GetPdtInfoByOne(pid uint) ([]byte, error) {
-	val, err := dao.GetRedis(pid)
+	val, err := cache.GetRedis(pid)
 	if err == nil {
 		return val, nil
 	}
@@ -30,7 +31,7 @@ func GetPdtInfoByOne(pid uint) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := dao.SaveInfoCache(pid, data); err != nil { // 回填失败别吞, 但也别因它不返回数据
+		if err := cache.SaveInfoCache(pid, data); err != nil { // 回填失败别吞, 但也别因它不返回数据
 			return nil, err
 		}
 		return data, nil

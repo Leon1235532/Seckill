@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/Leon1235532/Seckill/cache"
 	"github.com/Leon1235532/Seckill/dao"
 	"github.com/Leon1235532/Seckill/rabbitmq"
 	"github.com/Leon1235532/Seckill/schemas"
@@ -26,7 +27,7 @@ func CreatePdtHandler(c *gin.Context) {
 		return
 	}
 	// info同步保存到 Redis缓存
-	if err := dao.AddInfoCache(id); err != nil {
+	if err := cache.AddInfoCache(id); err != nil {
 		FailResponse(c, 500, "Preload activity failed!", err)
 		return
 	}
@@ -55,7 +56,7 @@ func UpdatePdtHandler(c *gin.Context) {
 		return
 	}
 
-	if err := dao.ModifyCache(uint(pid), &modifyinfo); err != nil {
+	if err := cache.ModifyCache(uint(pid), &modifyinfo); err != nil {
 		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
@@ -79,7 +80,7 @@ func DeleteHandler(c *gin.Context) {
 		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
-	if err := dao.DeleteCache(uint(pid)); err != nil {
+	if err := cache.DeleteCache(uint(pid)); err != nil {
 		FailResponse(c, 500, ServerMsg, err)
 		return
 	}
@@ -119,7 +120,7 @@ func SaleHandler(c *gin.Context) {
 		return
 	}
 
-	res, err := dao.SecKill(c.Request.Context(), info.Uid, info.Pid)
+	res, err := cache.SecKill(c.Request.Context(), info.Uid, info.Pid)
 	if err != nil {
 		FailResponse(c, 500, ServerMsg, err)
 		return
@@ -133,7 +134,7 @@ func SaleHandler(c *gin.Context) {
 		}
 
 		if err := rabbitmq.PublishWithBreaker("seckill_queue", body, 3); err != nil {
-			if compErr := dao.CompensateSecKill(info.Uid, info.Pid); compErr != nil {
+			if compErr := cache.CompensateSecKill(info.Uid, info.Pid); compErr != nil {
 				log.Printf("Order Compensate Failed, uid=%d pid=%d: %v",
 					info.Uid, info.Pid, compErr)
 			}

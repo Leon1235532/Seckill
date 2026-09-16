@@ -1,4 +1,4 @@
-package dao
+package cache
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/Leon1235532/Seckill/dao"
 	"github.com/Leon1235532/Seckill/schemas"
 	"github.com/Leon1235532/Seckill/setting"
 	"github.com/redis/go-redis/v9"
@@ -116,7 +117,7 @@ func SaveInfoCache(pid uint, data []byte) error { // 裸SETEX
 }
 
 func AddInfoCache(pid uint) error { // 1. 备一个空的结构体准备装货
-	p, err := QueryPdtinfo(pid)
+	p, err := dao.QueryPdtinfo(pid)
 	if err != nil {
 		return err
 	}
